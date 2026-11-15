@@ -1,0 +1,172 @@
+# hotstar - local stack. Start with:  docker compose up --build -d
+name: hotstar
+
+x-python-service: &python-service
+  restart: unless-stopped
+  networks: [backend, data]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  environment: &common-env
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (run scripts/init-env first)}
+    SEED_DATA: ${SEED_DATA:-false}
+
+services:
+  # ------------------------------------------------------------------ data tier
+  mysql:
+    build: { context: ./docker/mysql }
+    image: hotstar/mysql:local
+    restart: unless-stopped
+    networks: [data]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?}
+      USER_DB_PASSWORD: ${USER_DB_PASSWORD:?}
+      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:?}
+      VIDEO_DB_PASSWORD: ${VIDEO_DB_PASSWORD:?}
+      WATCHLIST_DB_PASSWORD: ${WATCHLIST_DB_PASSWORD:?}
+      HISTORY_DB_PASSWORD: ${HISTORY_DB_PASSWORD:?}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes: [mysql_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  minio:
+    image: ghcr.io/seaweedfs/minio-compat:latest
+    restart: unless-stopped
+    networks: [data]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    volumes: [minio_data:/data]
+    healthcheck:
+      test:  ["CMD-SHELL", "nc -z localhost 9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # ------------------------------------------------------------- application tier
+  auth-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/auth/Dockerfile }
+    image: hotstar/auth-service:local
+    environment:
+      <<: *common-env
+      DATABASE_URL: mysql+pymysql://auth_svc:${AUTH_DB_PASSWORD}@mysql:3306/auth_db
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-30}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-7}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL:-}
+      DEMO_USER_USERNAME: ${DEMO_USER_USERNAME:-demo}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-}
+    depends_on: { mysql: { condition: service_healthy } }
+
+  user-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/user/Dockerfile }
+    image: hotstar/user-service:local
+    environment:
+      <<: *common-env
+      DATABASE_URL: mysql+pymysql://user_svc:${USER_DB_PASSWORD}@mysql:3306/user_db
+    depends_on: { mysql: { condition: service_healthy } }
+
+  content-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/content/Dockerfile }
+    image: hotstar/content-service:local
+    environment:
+      <<: *common-env
+      DATABASE_URL: mysql+pymysql://content_svc:${CONTENT_DB_PASSWORD}@mysql:3306/content_db
+      VIDEO_SERVICE_URL: http://video-service:8004
+    depends_on: { mysql: { condition: service_healthy } }
+
+  video-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/video/Dockerfile }
+    image: hotstar/video-service:local
+    environment:
+      <<: *common-env
+      DATABASE_URL: mysql+pymysql://video_svc:${VIDEO_DB_PASSWORD}@mysql:3306/video_db
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000        # empty = real AWS S3 (credentials from the IAM role)
+      S3_BUCKET: ${S3_BUCKET:-hotstar-media}
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MAX_VIDEO_MB: ${MAX_VIDEO_MB:-2048}
+      MAX_IMAGE_MB: ${MAX_IMAGE_MB:-10}
+    depends_on:
+      mysql: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  watchlist-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/watchlist/Dockerfile }
+    image: hotstar/watchlist-service:local
+    environment:
+      <<: *common-env
+      DATABASE_URL: mysql+pymysql://watchlist_svc:${WATCHLIST_DB_PASSWORD}@mysql:3306/watchlist_db
+    depends_on: { mysql: { condition: service_healthy } }
+
+  history-service:
+    <<: *python-service
+    build: { context: ., dockerfile: services/history/Dockerfile }
+    image: hotstar/history-service:local
+    environment:
+      <<: *common-env
+      DATABASE_URL: mysql+pymysql://history_svc:${HISTORY_DB_PASSWORD}@mysql:3306/history_db
+    depends_on: { mysql: { condition: service_healthy } }
+
+  gateway:
+    build: { context: ., dockerfile: services/gateway/Dockerfile }
+    image: hotstar/api-gateway:local
+    restart: unless-stopped
+    networks: [edge, backend]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      JWT_SECRET: ${JWT_SECRET:?}
+      AUTH_SERVICE_URL: http://auth-service:8001
+      USER_SERVICE_URL: http://user-service:8002
+      CONTENT_SERVICE_URL: http://content-service:8003
+      VIDEO_SERVICE_URL: http://video-service:8004
+      WATCHLIST_SERVICE_URL: http://watchlist-service:8005
+      HISTORY_SERVICE_URL: http://history-service:8006
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+    ports: ["8000:8000"]          # Swagger UI: http://localhost:8000/docs
+    depends_on:
+      auth-service: { condition: service_healthy }
+      user-service: { condition: service_healthy }
+      content-service: { condition: service_healthy }
+      video-service: { condition: service_healthy }
+      watchlist-service: { condition: service_healthy }
+      history-service: { condition: service_healthy }
+
+  # ---------------------------------------------------------- presentation tier
+  frontend:
+    build: { context: ./frontend }
+    image: hotstar/web:local
+    restart: unless-stopped
+    networks: [edge]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      GATEWAY_URL: http://gateway:8000
+    ports: ["8081:8080"]          # the app: http://localhost:8080
+    depends_on: { gateway: { condition: service_healthy } }
+
+networks:
+  edge: {}      # browser-facing: frontend <-> gateway
+  backend: {}   # gateway <-> microservices (+ service-to-service)
+  data: {}      # microservices <-> MySQL / MinIO
+
+volumes:
+  mysql_data: {}
+  minio_data: {}

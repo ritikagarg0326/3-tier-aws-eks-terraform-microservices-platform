@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hotstar-common"
+version = "1.0.0"
+description = "Shared building blocks for hotstar microservices (logging, errors, JWT security, health, DB helpers)"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi", "sqlalchemy", "pydantic", "pydantic-settings", "PyJWT",
+]
+
+[tool.setuptools.packages.find]
+include = ["hotstar_common*"]
