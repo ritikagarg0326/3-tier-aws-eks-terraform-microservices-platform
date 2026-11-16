@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.video.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.services.video.name }}
+  ports:
+    - name: {{ .Values.services.video.service.portName }}
+      port: {{ .Values.services.video.service.port }}
+      targetPort: {{ .Values.services.video.service.targetPort }}
+      protocol: {{ .Values.services.video.service.protocol }}
+  type: {{ .Values.services.video.service.type }}

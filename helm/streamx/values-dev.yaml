@@ -1,0 +1,27 @@
+namespace: hotstar
+
+frontend:
+  replicas: 1
+
+gateway:
+  replicas: 1
+
+mysql:
+  replicas: 1
+
+services:
+  auth:
+    replicas: 1
+  content:
+    replicas: 1
+  history:
+    replicas: 1
+  user:
+    replicas: 1
+  video:
+    replicas: 1
+  watchlist:
+    replicas: 1
+
+seaweedfs:
+  replicas: 1

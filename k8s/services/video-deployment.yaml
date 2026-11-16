@@ -1,0 +1,43 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-service
+  namespace: hotstar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-service
+  template:
+    metadata:
+      labels:
+        app: video-service
+    spec:
+      containers:
+        - name: video-service
+          image: hotstar/video-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: hotstar-config
+            - secretRef:
+                name: hotstar-secret
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hotstar-secret
+                  key: VIDEO_DATABASE_URL
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hotstar-secret
+                  key: MINIO_ROOT_USER
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hotstar-secret
+                  key: MINIO_ROOT_PASSWORD

@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.services.watchlist.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.services.watchlist.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.services.watchlist.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.services.watchlist.name }}
+    spec:
+      containers:
+        - name: {{ .Values.services.watchlist.name }}
+          image: "{{ .Values.services.watchlist.image.repository }}:{{ .Values.services.watchlist.image.tag }}"
+          imagePullPolicy: {{ .Values.services.watchlist.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.services.watchlist.containerPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.configMap.name }}
+            - secretRef:
+                name: {{ .Values.secret.name }}
+          env:
+            {{- range .Values.services.watchlist.env }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.secret.name }}
+                  key: {{ .secretKey }}
+            {{- end }}

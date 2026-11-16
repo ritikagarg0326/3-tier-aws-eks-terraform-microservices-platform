@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.mysql.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  serviceName: {{ .Values.mysql.name }}
+  replicas: {{ .Values.mysql.replicas }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.mysql.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.mysql.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.mysql.name }}
+          image: "{{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}"
+          imagePullPolicy: {{ .Values.mysql.image.pullPolicy }}
+
+          ports:
+            - containerPort: {{ .Values.mysql.port }}
+              name: {{ .Values.mysql.portName }}
+
+          env:
+            - name: {{ .Values.mysql.secret.rootPasswordEnv }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name }}
+                  key: {{ .Values.mysql.secret.rootPasswordKey }}
+
+          {{- if .Values.mysql.persistence.enabled }}
+          volumeMounts:
+            - name: {{ .Values.mysql.volumeName }}
+              mountPath: {{ .Values.mysql.persistence.mountPath }}
+          {{- end }}
+
+          resources:
+            {{- toYaml .Values.mysql.resources | nindent 12 }}
+
+      {{- if .Values.mysql.persistence.enabled }}
+      volumes:
+        - name: {{ .Values.mysql.volumeName }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.mysql.persistence.existingClaim }}
+      {{- end }}

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.history.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.services.history.name }}
+  ports:
+    - name: {{ .Values.services.history.service.portName }}
+      port: {{ .Values.services.history.service.port }}
+      targetPort: {{ .Values.services.history.service.targetPort }}
+      protocol: {{ .Values.services.history.service.protocol }}
+  type: {{ .Values.services.history.service.type }}

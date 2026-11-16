@@ -12,6 +12,6 @@ FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 # nginx renders this template at start-up, substituting only GATEWAY_* variables
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist/hotstar-web/browser /usr/share/nginx/html
-ENV GATEWAY_URL=http://gateway:8000 NGINX_ENVSUBST_FILTER=GATEWAY_
+ENV GATEWAY_URL=http://api-gateway:8000 NGINX_ENVSUBST_FILTER=GATEWAY_
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1

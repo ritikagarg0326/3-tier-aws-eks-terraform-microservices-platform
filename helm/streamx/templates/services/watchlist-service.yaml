@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.services.watchlist.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: {{ .Values.services.watchlist.name }}
+  ports:
+    - name: {{ .Values.services.watchlist.service.portName }}
+      port: {{ .Values.services.watchlist.service.port }}
+      targetPort: {{ .Values.services.watchlist.service.targetPort }}
+      protocol: {{ .Values.services.watchlist.service.protocol }}
+  type: {{ .Values.services.watchlist.service.type }}

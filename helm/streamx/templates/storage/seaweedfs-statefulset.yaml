@@ -1,0 +1,56 @@
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.seaweedfs.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  serviceName: {{ .Values.seaweedfs.name }}
+  replicas: {{ .Values.seaweedfs.replicas }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.seaweedfs.name }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.seaweedfs.name }}
+
+    spec:
+      containers:
+        - name: {{ .Values.seaweedfs.name }}
+          image: "{{ .Values.seaweedfs.image.repository }}:{{ .Values.seaweedfs.image.tag }}"
+          imagePullPolicy: {{ .Values.seaweedfs.image.pullPolicy }}
+
+          args:
+            {{- toYaml .Values.seaweedfs.args | nindent 12 }}
+
+          env:
+            - name: {{ .Values.seaweedfs.secret.accessKeyEnv }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name }}
+                  key: {{ .Values.seaweedfs.secret.accessKey }}
+
+            - name: {{ .Values.seaweedfs.secret.secretKeyEnv }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secret.name }}
+                  key: {{ .Values.seaweedfs.secret.secretKey }}
+
+          ports:
+            {{- toYaml .Values.seaweedfs.ports | nindent 12 }}
+
+          volumeMounts:
+            - name: {{ .Values.seaweedfs.persistence.volumeName }}
+              mountPath: {{ .Values.seaweedfs.persistence.mountPath }}
+
+          resources:
+            {{- toYaml .Values.seaweedfs.resources | nindent 12 }}
+
+      volumes:
+        - name: {{ .Values.seaweedfs.persistence.volumeName }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.seaweedfs.persistence.existingClaim }}

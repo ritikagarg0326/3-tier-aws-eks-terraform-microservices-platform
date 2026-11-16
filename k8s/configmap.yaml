@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hotstar-config
+  namespace: hotstar
+data:
+  MYSQL_HOST: mysql
+  MYSQL_PORT: "3306"
+  S3_ENDPOINT: http://seaweedfs:9000
+  S3_BUCKET: hotstar-media
+  LOG_LEVEL: INFO

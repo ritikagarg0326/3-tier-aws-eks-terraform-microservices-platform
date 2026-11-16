@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-service
+  namespace: hotstar
+spec:
+  selector:
+    app: content-service
+  ports:
+    - port: 8000
+      targetPort: 8003
+  type: ClusterIP

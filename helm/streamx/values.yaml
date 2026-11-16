@@ -1,0 +1,233 @@
+namespace: hotstar
+
+configMap:
+  name: hotstar-config
+  data:
+    MYSQL_HOST: mysql
+    MYSQL_PORT: "3306"
+    S3_ENDPOINT: http://seaweedfs:9000
+    S3_BUCKET: hotstar-media
+    LOG_LEVEL: INFO
+
+secret:
+  name: hotstar-secret
+
+gateway:
+  name: api-gateway
+  replicas: 1
+  image:
+    repository: hotstar/api-gateway
+    tag: local
+    pullPolicy: IfNotPresent
+  containerPort: 8000
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+
+mysql:
+  name: mysql
+  replicas: 1
+  image:
+    repository: mysql
+    tag: "8.4"
+    pullPolicy: IfNotPresent
+  port: 3306
+  portName: mysql
+  volumeName: mysql-storage
+  secret:
+    rootPasswordEnv: MYSQL_ROOT_PASSWORD
+    rootPasswordKey: MYSQL_ROOT_PASSWORD
+  persistence:
+    enabled: true
+    existingClaim: mysql-pvc
+    mountPath: /var/lib/mysql
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  service:
+    type: ClusterIP
+    portName: mysql
+    port: 3306
+    targetPort: 3306
+    protocol: TCP
+
+frontend:
+  name: frontend
+  replicas: 1
+  image:
+    repository: hotstar/web
+    tag: fixed1
+    pullPolicy: IfNotPresent
+  port: 80
+  portName: http
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    portName: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+
+services:
+  auth:
+    name: auth-service
+    replicas: 1
+    image:
+      repository: hotstar/auth-service
+      tag: local
+      pullPolicy: IfNotPresent
+    containerPort: 8000
+    service:
+      type: ClusterIP
+      portName: http
+      port: 8000
+      targetPort: 8001
+      protocol: TCP
+    env:
+      - name: DATABASE_URL
+        secretKey: AUTH_DATABASE_URL
+  content:
+    name: content-service
+    replicas: 1
+    image:
+      repository: hotstar/content-service
+      tag: local
+      pullPolicy: IfNotPresent
+    containerPort: 8000
+    service:
+      type: ClusterIP
+      portName: http
+      port: 8000
+      targetPort: 8003
+      protocol: TCP
+    env:
+      - name: DATABASE_URL
+        secretKey: CONTENT_DATABASE_URL
+  history:
+    name: history-service
+    replicas: 1
+    image:
+      repository: hotstar/history-service
+      tag: local
+      pullPolicy: IfNotPresent
+    containerPort: 8000
+    service:
+      type: ClusterIP
+      portName: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    env:
+      - name: DATABASE_URL
+        secretKey: HISTORY_DATABASE_URL
+  user:
+    name: user-service
+    replicas: 1
+    image:
+      repository: hotstar/user-service
+      tag: local
+      pullPolicy: IfNotPresent
+    containerPort: 8000
+    service:
+      type: ClusterIP
+      portName: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    env:
+      - name: DATABASE_URL
+        secretKey: USER_DATABASE_URL
+  video:
+    name: video-service
+    replicas: 1
+    image:
+      repository: hotstar/video-service
+      tag: local
+      pullPolicy: IfNotPresent
+    containerPort: 8000
+    service:
+      type: ClusterIP
+      portName: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    env:
+      - name: DATABASE_URL
+        secretKey: VIDEO_DATABASE_URL
+      - name: S3_ACCESS_KEY
+        secretKey: MINIO_ROOT_USER
+      - name: S3_SECRET_KEY
+        secretKey: MINIO_ROOT_PASSWORD
+  watchlist:
+    name: watchlist-service
+    replicas: 1
+    image:
+      repository: hotstar/watchlist-service
+      tag: local
+      pullPolicy: IfNotPresent
+    containerPort: 8000
+    service:
+      type: ClusterIP
+      portName: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+    env:
+      - name: DATABASE_URL
+        secretKey: WATCHLIST_DATABASE_URL
+
+seaweedfs:
+  name: seaweedfs
+  replicas: 1
+  image:
+    repository: chrislusf/seaweedfs
+    tag: latest
+    pullPolicy: IfNotPresent
+  args:
+    - server
+    - -dir=/data
+    - -s3
+    - -s3.port=8333
+  secret:
+    accessKeyEnv: AWS_ACCESS_KEY_ID
+    secretKeyEnv: AWS_SECRET_ACCESS_KEY
+    accessKey: MINIO_ROOT_USER
+    secretKey: MINIO_ROOT_PASSWORD
+  ports:
+    - name: s3
+      containerPort: 8333
+      protocol: TCP
+    - name: master
+      containerPort: 9333
+      protocol: TCP
+    - name: volume
+      containerPort: 8080
+      protocol: TCP
+  persistence:
+    existingClaim: seaweedfs-pvc
+    mountPath: /data
+    volumeName: seaweedfs-storage
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  service:
+    type: ClusterIP
+    port: 8333
+    targetPort: 8333
+    protocol: TCP

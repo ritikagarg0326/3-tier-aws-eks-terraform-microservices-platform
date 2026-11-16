@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.seaweedfs.name }}
+  namespace: {{ .Values.namespace }}
+
+spec:
+  selector:
+    app: {{ .Values.seaweedfs.name }}
+
+  ports:
+    - name: {{ (index .Values.seaweedfs.ports 0).name }}
+      port: {{ .Values.seaweedfs.service.port }}
+      targetPort: {{ .Values.seaweedfs.service.targetPort }}
+      protocol: {{ .Values.seaweedfs.service.protocol }}
+
+  type: {{ .Values.seaweedfs.service.type }}
