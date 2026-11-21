@@ -118,14 +118,5 @@ Everything is environment-driven (see `.env.example` and each service's `.env.ex
 * **Upload fails with 413** – limits are `MAX_VIDEO_MB` (default 2048) and `MAX_IMAGE_MB` (10).
 * **`exec ... entrypoint.sh: no such file` on Windows** – CRLF line endings; the Dockerfiles strip them, but make sure Git does not rewrite the Dockerfiles (`.gitattributes` is included).
 
-## What has and has not been verified
 
-Verified in the build environment: all backend test suites pass; the full stack (gateway + 6 services, real Alembic migrations, seeds, uploads, Range streaming, JWT/RBAC) passes the 36-check end-to-end smoke test over HTTP (SQLite + local-file storage standing in for MySQL/MinIO); the Angular app compiles in production mode with strict templates; compose files parse; every `requirements.txt` resolves in a clean environment.
 
-**Not verifiable where this was built** (no Docker daemon, no browser): `docker compose build/up` itself, the MySQL 8.4 and MinIO integrations (the code uses standard SQLAlchemy/PyMySQL and boto3, and the migrations are plain DDL, but they have not been run against those servers here), and the UI has not been clicked through in a browser. If anything fails on your first `docker compose up`, the logs (`docker compose logs <service>`) will point at it – those are the places to look first.
-
-No automated frontend unit tests are included (Karma needs a browser); the end-to-end smoke test exercises the same API paths the UI uses.
-
-## Next phase (not included)
-
-AWS EKS, Terraform, GitHub Actions, Prometheus/Grafana, CloudWatch, ELK. The services are already prepared for it: env-only configuration, `/health` + `/ready` probes, JSON logs, non-root multi-stage images, S3-compatible storage with IAM-role support, and migrations that can be moved to a Job.
